@@ -32,3 +32,38 @@ I use a semaphore to signal the ping thread that pong is awake by setting our se
 ```C
 sem_init(&shared_sem, 0, 0);
 ```
+
+
+Then inside the ping function I tell the ping function to wait with `sem_wait()` and the thread waits till pong is up and running and pong posts the sem. Pong then waits for a corresponding signal from ping `thread_cond`.
+
+```C
+void * ping(void * rarg)
+{   
+    struct shared * arg = (struct shared *) rarg;
+       for (size_t i = 0; i < NUM_OF_LOOPS; i++)
+    {
+        //wait for sem to post
+        sem_wait(&arg->shared_sem);
+        pthread_mutex_lock(&arg->lock);
+        arg->count++;
+        print_ping(arg->count);
+        pthread_mutex_unlock(&arg->lock);
+        pthread_cond_signal(&arg->thread_cond);
+    }
+}
+```
+
+```C
+void * pong(void * rarg)
+{
+    struct shared * arg = (struct shared *) rarg;
+
+    while(arg->count < NUM_OF_LOOPS){
+        //post sem wait for signal
+        sem_post(&arg->shared_sem);
+        pthread_cond_wait(&arg->thread_cond, &arg->lock);
+        print_pong(arg->count);
+    }
+    
+}
+```
