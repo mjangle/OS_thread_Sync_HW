@@ -14,7 +14,7 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-#define NUM_OF_LOOPS 10
+#define NUM_OF_LOOPS 1000
 
 struct shared{
     sem_t shared_sem;
@@ -53,7 +53,7 @@ void print_pong(int count)
 void * ping(void * rarg)
 {   
     struct shared * arg = (struct shared *) rarg;
-       for (size_t i = 0; i < 10; i++)
+       for (size_t i = 0; i < NUM_OF_LOOPS; i++)
     {
         //wait for sem to post
         sem_wait(&arg->shared_sem);
@@ -74,18 +74,13 @@ void * ping(void * rarg)
 void * pong(void * rarg)
 {
     struct shared * arg = (struct shared *) rarg;
-    
-    //lock mutext and post sem
-    pthread_mutex_lock(&arg->lock);
-    sem_post(&arg->shared_sem);
 
     while(arg->count < NUM_OF_LOOPS){
-        //wait for signal
+        //post sem wait for signal
+        sem_post(&arg->shared_sem);
         pthread_cond_wait(&arg->thread_cond, &arg->lock);
         print_pong(arg->count);
-        sem_post(&arg->shared_sem);
     }
-    pthread_mutex_unlock(&arg->lock);
     
 }
 
@@ -96,23 +91,12 @@ int main(int argc, char const *argv[])
     pthread_t ping_thread;
     pthread_t pong_thread;
     
-    //create and  sem, conditional and mutex lock
-    sem_t shared_sem;
-    pthread_cond_t thread_cond;
-    pthread_mutex_t lock;
-
-    //initilize sem, conditional and mutex
-    sem_init(&shared_sem, 0, 0);
-    pthread_mutex_init(&lock, NULL);
-    pthread_cond_init(&thread_cond, NULL);
-    int count = 0;
-
     //create shared struct
     struct shared * shared_struct = malloc(sizeof(struct shared));
-    shared_struct->count = count;
-    shared_struct->lock = lock;
-    shared_struct->shared_sem = shared_sem;
-    shared_struct->thread_cond = thread_cond;
+    shared_struct->count = 0;
+    pthread_mutex_init(&shared_struct->lock, NULL);
+    sem_init(&shared_struct->shared_sem, 0, 0);
+    pthread_cond_init(&shared_struct->thread_cond, NULL);
 
     //create threads
     pthread_create(&ping_thread, NULL, ping, ( void *) shared_struct);
@@ -121,10 +105,6 @@ int main(int argc, char const *argv[])
     //joing threads
     pthread_join(ping_thread, NULL);
     pthread_join(pong_thread, NULL);
-
-    //destroy mutex and cond
-    pthread_mutex_destroy(&lock);
-    pthread_cond_destroy(&thread_cond);
 
     //free struct
     free(shared_struct);
