@@ -30,9 +30,9 @@ void * ping(void * rarg)
        for (size_t i = 0; i < 10; i++)
     {
         sem_wait(&arg->shared_sem);
-        print_ping(arg->count);
         pthread_mutex_lock(&arg->lock);
         arg->count++;
+        print_ping(arg->count);
         pthread_mutex_unlock(&arg->lock);
         pthread_cond_signal(&arg->thread_cond);
     }
@@ -43,7 +43,7 @@ void * pong(void * rarg)
     struct shared * arg = (struct shared *) rarg;
     pthread_mutex_lock(&arg->lock);
     sem_post(&arg->shared_sem);
-    while(1){
+    while(arg->count < NUM_OF_LOOPS){
     pthread_cond_wait(&arg->thread_cond, &arg->lock);
     print_pong(arg->count);
     sem_post(&arg->shared_sem);
@@ -66,7 +66,7 @@ int main(int argc, char const *argv[])
     sem_init(&shared_sem, 0, 0);
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&thread_cond, NULL);
-    int count = 1;
+    int count = 0;
 
     struct shared * shared_struct = malloc(sizeof(struct shared));
     shared_struct->count = count;
